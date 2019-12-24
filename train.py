@@ -55,7 +55,7 @@ val_loader = torch.utils.data.DataLoader(val_data,
                                          shuffle=False,
                                          num_workers=5)
 
-vgg_model = models.VGGNet(requires_grad=False)
+vgg_model = models.VGGNet(requires_grad=False,pretrained=False)
 fcn_model = models.FCN8s(pretrained_net=vgg_model, n_class=n_class)
 
 if use_cuda:
@@ -88,7 +88,7 @@ def train(epoch):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()            # update all arguments
-        total_loss += loss.data[0]  # return float
+        total_loss += loss.item() # return float
 
         # if batch_idx == 2:
         #     break
@@ -135,7 +135,7 @@ def test(epoch):
         out = fcn_model(imgs)
         loss = criterion(out, labels)
         loss /= N
-        total_loss += loss.data[0]
+        total_loss += loss.item() 
 
         if (batch_idx + 1) % 3 == 0:
             print('test epoch [%d/%d], iter[%d/%d], aver_loss %.5f' % (epoch,
