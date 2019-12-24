@@ -38,7 +38,7 @@ use_cuda = torch.cuda.is_available()
 # path = os.path.expanduser('/home/yxk/Downloads/')
 
 # dataset 2007
-data_path = os.path.expanduser('/home/yxk/data/')
+data_path = os.path.expanduser('data/')
 
 print('load data....')
 train_data = voc_loader.VOC2012ClassSeg(root=data_path, split='train', transform=True)
@@ -55,7 +55,7 @@ val_loader = torch.utils.data.DataLoader(val_data,
                                          shuffle=False,
                                          num_workers=5)
 
-vgg_model = models.VGGNet(requires_grad=True)
+vgg_model = models.VGGNet(requires_grad=False)
 fcn_model = models.FCN8s(pretrained_net=vgg_model, n_class=n_class)
 
 if use_cuda:
