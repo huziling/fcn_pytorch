@@ -39,7 +39,8 @@ class DSSESegBase(data.Dataset):
         self.files = collections.defaultdict(list)
         for img_name in os.listdir(osp.join(dataset_dir,'JPEGImages')):
             img_file = osp.join(dataset_dir, 'JPEGImages/%s' % img_name)
-            lbl_file = osp.join(dataset_dir, 'SegmentationClass/' % img_name.replace('jpg','npy'))
+            lbl_name = img_name.replace('.jpg','_gt.npy')
+            lbl_file = osp.join(dataset_dir, 'Annotation_img/%s' % lbl_name)
             self.files['train'].append({
                 'img': img_file,
                 'lbl': lbl_file,
