@@ -11,6 +11,7 @@ import loss
 from torch.optim import Adam, SGD
 from tensorboardX import SummaryWriter
 from argparse import ArgumentParser
+import dsse_loader
 import tools
 
 
@@ -41,19 +42,19 @@ use_cuda = torch.cuda.is_available()
 data_path = os.path.expanduser('data/')
 
 print('load data....')
-train_data = voc_loader.VOC2012ClassSeg(root=data_path, split='train', transform=True)
+train_data = dsse_loader.DSSEClassSeg(root=data_path, split='train', transform=True)
 
 train_loader = torch.utils.data.DataLoader(train_data,
                                            batch_size=batch_size,
                                            shuffle=True,
                                            num_workers=5)
-val_data = voc_loader.VOC2012ClassSeg(root=data_path,
-                            split='val',
-                            transform=True)
-val_loader = torch.utils.data.DataLoader(val_data,
-                                         batch_size=batch_size,
-                                         shuffle=False,
-                                         num_workers=5)
+# val_data = voc_loader.VOC2012ClassSeg(root=data_path,
+#                             split='val',
+#                             transform=True)
+# val_loader = torch.utils.data.DataLoader(val_data,
+#                                          batch_size=batch_size,
+#                                          shuffle=False,
+#                                          num_workers=5)
 
 vgg_model = models.VGGNet(requires_grad=False,pretrained=False)
 fcn_model = models.FCN8s(pretrained_net=vgg_model, n_class=n_class)
@@ -122,36 +123,36 @@ def train(epoch):
     print('train epoch [%d/%d] average_loss %.5f' % (epoch, epoch_num, total_loss))
 
 
-def test(epoch):
-    fcn_model.eval()
-    total_loss = 0.
-    for batch_idx, (imgs, labels) in enumerate(val_loader):
-        N = imgs.size(0)
-        if use_cuda:
-            imgs = imgs.cuda()
-            labels = labels.cuda()
-        imgs = Variable(imgs)    # , volatile=True
-        labels = Variable(labels)  # , volatile=True
-        out = fcn_model(imgs)
-        loss = criterion(out, labels)
-        loss /= N
-        total_loss += loss.item() 
+# def test(epoch):
+#     fcn_model.eval()
+#     total_loss = 0.
+#     for batch_idx, (imgs, labels) in enumerate(val_loader):
+#         N = imgs.size(0)
+#         if use_cuda:
+#             imgs = imgs.cuda()
+#             labels = labels.cuda()
+#         imgs = Variable(imgs)    # , volatile=True
+#         labels = Variable(labels)  # , volatile=True
+#         out = fcn_model(imgs)
+#         loss = criterion(out, labels)
+#         loss /= N
+#         total_loss += loss.item() 
 
-        if (batch_idx + 1) % 3 == 0:
-            print('test epoch [%d/%d], iter[%d/%d], aver_loss %.5f' % (epoch,
-                                                                       epoch_num, batch_idx, len(val_loader),
-                                                                       total_loss / (batch_idx + 1)))
+#         if (batch_idx + 1) % 3 == 0:
+#             print('test epoch [%d/%d], iter[%d/%d], aver_loss %.5f' % (epoch,
+#                                                                        epoch_num, batch_idx, len(val_loader),
+#                                                                        total_loss / (batch_idx + 1)))
 
 
 
-    total_loss /= len(val_loader)
-    print('test epoch [%d/%d] average_loss %.5f' % (epoch, epoch_num, total_loss))
+#     total_loss /= len(val_loader)
+#     print('test epoch [%d/%d] average_loss %.5f' % (epoch, epoch_num, total_loss))
 
-    global best_test_loss
-    if best_test_loss > total_loss:
-        best_test_loss = total_loss
-        print('best loss....')
-        # fcn_model.save('SBD.pth')
+#     global best_test_loss
+#     if best_test_loss > total_loss:
+#         best_test_loss = total_loss
+#         print('best loss....')
+#         # fcn_model.save('SBD.pth')
 
 
 if __name__ == '__main__':
