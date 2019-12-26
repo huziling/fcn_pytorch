@@ -64,9 +64,14 @@ class DSSESegBase(data.Dataset):
         data_file = self.files[self.split][index]    # 数据
         # load image
         img_file = data_file['img']
+        # print(img_file)
         img = PIL.Image.open(img_file)
+        if img.mode != 'RGB':
+            img = img.convert("RGB")
         img = np.array(img, dtype=np.uint8)
         # load label
+        # print(img.shape)
+        
         lbl_file = data_file['lbl']
         lbl = np.load(lbl_file)
         # lbl = PIL.Image.open(lbl_file)

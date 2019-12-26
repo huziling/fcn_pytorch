@@ -13,8 +13,7 @@ from tensorboardX import SummaryWriter
 from argparse import ArgumentParser
 import dsse_loader
 import tools
-
-
+from Models import FCN_8s,resnet50
 # argumentparse
 parser = ArgumentParser()
 parser.add_argument('-bs', '--batch_size', type=int, default=2, help="batch size of the data")
@@ -56,9 +55,10 @@ train_loader = torch.utils.data.DataLoader(train_data,
 #                                          shuffle=False,
 #                                          num_workers=5)
 
-vgg_model = models.VGGNet(requires_grad=False,pretrained=False)
-fcn_model = models.FCN8s(pretrained_net=vgg_model, n_class=n_class)
-
+# vgg_model = models.VGGNet(requires_grad=False,pretrained=True)
+# fcn_model = models.FCN8s(pretrained_net=vgg_model, n_class=n_class)
+res_model = resnet50(pretrained= True)
+fcn_model = FCN_8s(pretrained_net=res_model,n_class=n_class)
 if use_cuda:
     fcn_model.cuda()
 
@@ -118,6 +118,8 @@ def train(epoch):
 
     # model save
     if (epoch) % 20 == 0:
+        if not os.path.exists('pretrained_models'):
+            os.mkdir('pretrained_models')
         torch.save(fcn_model.state_dict(), './pretrained_models/model%d.pth'%epoch)  # save for 5 epochs
     total_loss /= len(train_loader)
     print('train epoch [%d/%d] average_loss %.5f' % (epoch, epoch_num, total_loss))
