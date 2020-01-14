@@ -6,8 +6,8 @@ import torch.utils.model_zoo as model_zoo
 import torch
 import torch.nn.functional as F
 from torchsummary import summary
-from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
-from .Convolution import SeparableConv2d
+# from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+# from .Convolution import SeparableConv2d
 import os
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -60,10 +60,11 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         
         if sparable:
-            self.conv1 = SeparableConv2d(inplanes, planes, kernel_size=1, bias=False)
-            self.conv2 = SeparableConv2d(planes, planes, kernel_size=3, stride=stride,
-            dilation=dilation, bias=False)
-            self.conv3 = SeparableConv2d(planes, planes * self.expansion, kernel_size=1, bias=False)
+            pass
+            # self.conv1 = SeparableConv2d(inplanes, planes, kernel_size=1, bias=False)
+            # self.conv2 = SeparableConv2d(planes, planes, kernel_size=3, stride=stride,
+            # dilation=dilation, bias=False)
+            # self.conv3 = SeparableConv2d(planes, planes * self.expansion, kernel_size=1, bias=False)
         else:
             self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
             self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
@@ -161,6 +162,7 @@ class ResNet(nn.Module):
         model_dict = {}
         state_dict = self.state_dict()
         for k, v in pretrain_dict.items():
+            print(k)
             if k in state_dict:
                 model_dict[k] = v
         state_dict.update(model_dict)
@@ -240,3 +242,8 @@ def resnet18(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = Fals
     """
     model = ResNet(BasicBlock, [2, 2, 2, 2], bn_momentum, pretrained, output_stride,mode ='resnet18',sparable = sparable)
     return model
+
+if __name__ == "__main__":
+    model = resnet18(pretrained=True)
+    for item in model.state_dict().keys():
+        print(item)
