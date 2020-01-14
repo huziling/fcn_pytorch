@@ -1,4 +1,3 @@
-
 from __future__ import print_function
 import torch
 import torch.nn as nn
@@ -8,16 +7,10 @@ from torchvision.models.vgg import VGG
 import torch.nn.functional as F
 from torch.nn import init
 import numpy as np
-
-"""
-
-"""
+from se_module import SELayer, SEGet
 
 
 def get_upsample_weight(in_channels, out_channels, kernel_size):
-    '''
-    make a 2D bilinear kernel suitable for upsampling
-    '''
     factor = (kernel_size + 1) // 2
     if kernel_size % 2 == 1:
         center = factor - 1
@@ -32,6 +25,7 @@ def get_upsample_weight(in_channels, out_channels, kernel_size):
 
     return torch.from_numpy(weight).float()
 
+
 class FCN32s(nn.Module):
     def __init__(self, pretrained_net, n_class):
         super().__init__()
@@ -39,7 +33,6 @@ class FCN32s(nn.Module):
         self.pretrained_net = pretrained_net
         self.relu = nn.ReLU(inplace=True)
         self.deconv1 = nn.ConvTranspose2d(512, 512, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
-        nn.SyncBatchNorm()
         self.bn1 = nn.BatchNorm2d(512)
         self.deconv2 = nn.ConvTranspose2d(512, 256, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
         self.bn2 = nn.BatchNorm2d(256)
@@ -54,12 +47,12 @@ class FCN32s(nn.Module):
     def forward(self, x):
         output = self.pretrained_net.forward(x)
         x5 = output['x5']  # size=[n, 512, x.h/32, x.w/32]
-        score = self.bn1(self.relu(self.deconv1(x5)))        # size=[n, 512, x.h/16, x.w/16]
-        score = self.bn2(self.relu(self.deconv2(score)))     # size=[n, 256, x.h/8, x.w/8]
-        score = self.bn3(self.relu(self.deconv3(score)))     # size=[n, 128, x.h/4, x.w/4]
-        score = self.bn4(self.relu(self.deconv4(score)))     # size=[n, 64, x.h/2, x.w/2]
-        score = self.bn5(self.relu(self.deconv5(score)))     # size=[n, 32, x.h, x.w]
-        score = self.classifier(score)                       # size=[n, n_class, x.h, x.w]
+        score = self.bn1(self.relu(self.deconv1(x5)))  # size=[n, 512, x.h/16, x.w/16]
+        score = self.bn2(self.relu(self.deconv2(score)))  # size=[n, 256, x.h/8, x.w/8]
+        score = self.bn3(self.relu(self.deconv3(score)))  # size=[n, 128, x.h/4, x.w/4]
+        score = self.bn4(self.relu(self.deconv4(score)))  # size=[n, 64, x.h/2, x.w/2]
+        score = self.bn5(self.relu(self.deconv5(score)))  # size=[n, 32, x.h, x.w]
+        score = self.classifier(score)  # size=[n, n_class, x.h, x.w]
 
         return score
 
@@ -87,13 +80,13 @@ class FCN16s(nn.Module):
         x5 = output['x5']  # size=[n, 512, x.h/32, x.w/32]
         x4 = output['x4']  # size=[n, 512, x.h/16, x.w/16]
 
-        score = self.relu(self.deconv1(x5))                  # size=[n, 512, x.h/16, x.w/16]
-        score = self.bn1(score + x4)                         # element-wise add, size=[n, 512, x.h/16, x.w/16]
-        score = self.bn2(self.relu(self.deconv2(score)))     # size=[n, 256, x.h/8, x.w/8]
-        score = self.bn3(self.relu(self.deconv3(score)))     # size=[n, 128, x.h/4, x.w/4]
-        score = self.bn4(self.relu(self.deconv4(score)))     # size=[n, 64, x.h/2, x.w/2]
-        score = self.bn5(self.relu(self.deconv5(score)))     # size=[n, 32, x.h, x.w]
-        score = self.classifier(score)                       # size=[n, n_class, x.h, x.w]
+        score = self.relu(self.deconv1(x5))  # size=[n, 512, x.h/16, x.w/16]
+        score = self.bn1(score + x4)  # element-wise add, size=[n, 512, x.h/16, x.w/16]
+        score = self.bn2(self.relu(self.deconv2(score)))  # size=[n, 256, x.h/8, x.w/8]
+        score = self.bn3(self.relu(self.deconv3(score)))  # size=[n, 128, x.h/4, x.w/4]
+        score = self.bn4(self.relu(self.deconv4(score)))  # size=[n, 64, x.h/2, x.w/2]
+        score = self.bn5(self.relu(self.deconv5(score)))  # size=[n, 32, x.h, x.w]
+        score = self.classifier(score)  # size=[n, n_class, x.h, x.w]
 
         return score
 
@@ -116,13 +109,8 @@ class FCN8s(nn.Module):
         self.bn5 = nn.BatchNorm2d(32)
         self.classifier = nn.Conv2d(32, n_class, kernel_size=1)
 
-        # self._init_weights()
-        #
-        # 1
         init.xavier_uniform_(self.deconv1.weight)
-        # 2
         init.xavier_uniform_(self.deconv2.weight)
-        # 3
         init.xavier_uniform_(self.deconv3.weight)
         init.xavier_uniform_(self.deconv4.weight)
         init.xavier_uniform_(self.deconv5.weight)
@@ -134,21 +122,18 @@ class FCN8s(nn.Module):
         x4 = output['x4']  # size=[n, 512, x.h/16, x.w/16]
         x3 = output['x3']  # size=[n, 512, x.h/8, x.w/8]
 
-        score = self.relu(self.deconv1(x5))                  # size=[n, 512, x.h/16, x.w/16]
-        score = self.bn1(score + x4)                         # element-wise add, size=[n, 512, x.h/16, x.w/16]
-        score = self.relu(self.deconv2(score))               # size=[n, 256, x.h/8, x.w/8]
-        score = self.bn2(score+x3)
-        score = self.bn3(self.relu(self.deconv3(score)))     # size=[n, 128, x.h/4, x.w/4]
-        score = self.bn4(self.relu(self.deconv4(score)))     # size=[n, 64, x.h/2, x.w/2]
-        score = self.bn5(self.relu(self.deconv5(score)))     # size=[n, 32, x.h, x.w]
-        score = self.classifier(score)                       # size=[n, n_class, x.h, x.w]
+        score = self.relu(self.deconv1(x5))  # size=[n, 512, x.h/16, x.w/16]
+        score = self.bn1(score + x4)  # element-wise add, size=[n, 512, x.h/16, x.w/16]
+        score = self.relu(self.deconv2(score))  # size=[n, 256, x.h/8, x.w/8]
+        score = self.bn2(score + x3)
+        score = self.bn3(self.relu(self.deconv3(score)))  # size=[n, 128, x.h/4, x.w/4]
+        score = self.bn4(self.relu(self.deconv4(score)))  # size=[n, 64, x.h/2, x.w/2]
+        score = self.bn5(self.relu(self.deconv5(score)))  # size=[n, 32, x.h, x.w]
+        score = self.classifier(score)  # size=[n, n_class, x.h, x.w]
 
         return score
 
     def _init_weights(self):
-        '''
-        hide method, used just in class
-        '''
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 m.weight.data.zero_()
@@ -157,15 +142,114 @@ class FCN8s(nn.Module):
             if isinstance(m, nn.ConvTranspose2d):
                 assert m.kernel_size[0] == m.kernel_size[1]
                 initial_weight = get_upsample_weight(m.in_channels,
-                            m.out_channels, m.kernel_size[0])
-                m.weight.data.copy_(initial_weight)                 # copy not = ?
+                                                     m.out_channels, m.kernel_size[0])
+                m.weight.data.copy_(initial_weight)  # copy not = ?
 
 
 class FCN1s(nn.Module):
-    def __init__(self, pretrained_net, n_class):
+    def __init__(self, pretrained_net, n_class, Time=False, Space=False):
         super().__init__()
         self.n_class = n_class
+        self.Time = Time
+        self.Space = Space
         self.pretrained_net = pretrained_net
+        self.S1 = SEGet(64, 2)
+        self.S2 = SEGet(128, 16)
+        self.S3 = SEGet(256, 16)
+        self.S4 = SEGet(512, 16)
+        self.S5 = SEGet(512, 16)
+
+        self.relu = nn.ReLU(inplace=True)
+        self.deconv1 = nn.ConvTranspose2d(512, 512, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.se1 = SELayer(512, 16)
+        self.bn1 = nn.BatchNorm2d(512)
+        self.deconv2 = nn.ConvTranspose2d(512, 256, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.se2 = SELayer(256, 16)
+        self.bn2 = nn.BatchNorm2d(256)
+        self.deconv3 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.se3 = SELayer(128, 16)
+        self.bn3 = nn.BatchNorm2d(128)
+        self.deconv4 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.se4 = SELayer(64, 16)
+        self.bn4 = nn.BatchNorm2d(64)
+        self.deconv5 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.se5 = SELayer(32, 16)
+        self.bn5 = nn.BatchNorm2d(32)
+        self.classifier = nn.Conv2d(32, n_class, kernel_size=1)
+
+    def forward(self, x):
+        output = self.pretrained_net.forward(x)
+        x5 = output['x5']  # size=[n, 512, x.h/32, x.w/32]
+        x4 = output['x4']  # size=[n, 512, x.h/16, x.w/16]
+        x3 = output['x3']  # size=[n, 512, x.h/8, x.w/8]
+        x2 = output['x2']  # size=[n, 512, x.h/4, x.w/4]
+        x1 = output['x1']  # size=[n, 512, x.h/2, x.w/2]
+
+        if self.Space:
+            S1 = self.S1(x1)
+            S2 = self.S2(x2)
+            S3 = self.S3(x3)
+            S4 = self.S4(x4)
+            S5 = self.S5(x4)
+
+            # if self.Time:
+
+        score = self.deconv1(x5)
+        # if self.Space:
+        #     score = score*S5
+        # if self.Time:
+        #     score = self.se1(score)
+        score = self.relu(score)
+
+        score = self.bn1(score + x4)
+        if self.Space:
+            score = score * S4
+        score = self.deconv2(score)
+        if self.Time:
+            score = self.se2(score)
+        score = self.relu(score)
+
+        score = self.bn2(score + x3)
+        if self.Space:
+            score = score * S3
+        score = self.deconv3(score)
+        if self.Time:
+            score = self.se3(score)
+        score = self.relu(score)
+
+        score = self.bn3(score + x2)
+        if self.Space:
+            score = score * S2
+        score = self.deconv4(score)
+        if self.Time:
+            score = self.se4(score)
+        score = self.relu(score)
+
+        score = self.bn4(score + x1)
+        if self.Space:
+            score = score * S1
+        score = self.deconv5(score)
+        if self.Time:
+            score = self.se5(score)
+        score = self.bn5(score)
+        score = self.classifier(score)
+
+        return score
+
+
+class FCNss(nn.Module):
+    def __init__(self, pretrained_net, n_class, Time=False, Space=False):
+        super().__init__()
+        self.n_class = n_class
+        self.Time = Time
+        self.Space = Space
+        self.pretrained_net = pretrained_net
+        self.S1 = SEGet(64, 16)
+        self.S2 = SEGet(128, 16)
+        self.S3 = SEGet(256, 16)
+        self.S4 = SEGet(512, 16)
+        self.S5 = SEGet(512, 16)
+
         self.relu = nn.ReLU(inplace=True)
         self.deconv1 = nn.ConvTranspose2d(512, 512, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
         self.bn1 = nn.BatchNorm2d(512)
@@ -187,23 +271,129 @@ class FCN1s(nn.Module):
         x2 = output['x2']  # size=[n, 512, x.h/4, x.w/4]
         x1 = output['x1']  # size=[n, 512, x.h/2, x.w/2]
 
-        score = self.relu(self.deconv1(x5))                  # size=[n, 512, x.h/16, x.w/16]
-        score = self.bn1(score + x4)                         # element-wise add, size=[n, 512, x.h/16, x.w/16]
-        score = self.relu(self.deconv2(score))               # size=[n, 256, x.h/8, x.w/8]
-        score = self.bn2(score+x3)
-        score = self.relu(self.deconv3(score))               # size=[n, 128, x.h/4, x.w/4]
-        score = self.bn3(score+x2)
-        score = self.relu(self.deconv4(score))               # size=[n, 64, x.h/2, x.w/2]
-        score = self.bn4(score+x1)
-        score = self.bn5(self.relu(self.deconv5(score)))     # size=[n, 32, x.h, x.w]
-        score = self.classifier(score)                       # size=[n, n_class, x.h, x.w]
+        S1 = torch.sum(torch.sum(self.S1(x1)))
+        S2 = torch.sum(torch.sum(self.S2(x2)))
+        S3 = torch.sum(torch.sum(self.S3(x3)))
+        S4 = torch.sum(torch.sum(self.S4(x4)))
+
+        total_sum = S1 + S2 + S3 + S4
+
+        s1 = torch.div(S1, total_sum)
+        s2 = torch.div(S2, total_sum)
+        s3 = torch.div(S3, total_sum)
+        s4 = torch.div(S4, total_sum)
+
+        score = self.relu(self.deconv1(x5))  # size=[n, 512, x.h/16, x.w/16]
+        score = self.bn1(score + x4 * s4)  # element-wise add, size=[n, 512, x.h/16, x.w/16]
+        score = self.relu(self.deconv2(score))  # size=[n, 256, x.h/8, x.w/8]
+        score = self.bn2(score + x3 * s3)
+        score = self.relu(self.deconv3(score))  # size=[n, 128, x.h/4, x.w/4]
+        score = self.bn3(score + x2 * s2)
+        score = self.relu(self.deconv4(score))  # size=[n, 64, x.h/2, x.w/2]
+        score = self.bn4(score + x1 * s1)
+        score = self.bn5(self.relu(self.deconv5(score)))  # size=[n, 32, x.h, x.w]
+        score = self.classifier(score)  # size=[n, n_class, x.h, x.w]
 
         return score
 
+
+class FCN1(nn.Module):
+    def __init__(self, pretrained_net, n_class):
+        super().__init__()
+        self.n_class = n_class
+        self.pretrained_net = pretrained_net
+        self.relu = nn.ReLU(inplace=True)
+        self.deconv1 = nn.ConvTranspose2d(512, 512, kernel_size=3, stride=2, padding=1, dilation=1,
+                                          output_padding=1)
+        self.bn1 = nn.BatchNorm2d(512)
+        self.deconv2 = nn.ConvTranspose2d(512, 256, kernel_size=3, stride=2, padding=1, dilation=1,
+                                          output_padding=1)
+        self.bn2 = nn.BatchNorm2d(256)
+        self.deconv3 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, dilation=1,
+                                          output_padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+        self.deconv4 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.bn4 = nn.BatchNorm2d(64)
+        self.deconv5 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.bn5 = nn.BatchNorm2d(32)
+        self.classifier = nn.Conv2d(32, n_class, kernel_size=1)
+
+    def forward(self, x):
+        output = self.pretrained_net.forward(x)
+        x5 = output['x5']  # size=[n, 512, x.h/32, x.w/32]
+        x4 = output['x4']  # size=[n, 512, x.h/16, x.w/16]
+        x3 = output['x3']  # size=[n, 512, x.h/8, x.w/8]
+        x2 = output['x2']  # size=[n, 512, x.h/4, x.w/4]
+        x1 = output['x1']  # size=[n, 512, x.h/2, x.w/2]
+
+        score = self.relu(self.deconv1(x5))  # size=[n, 512, x.h/16, x.w/16]
+        score = self.bn1(score + x4 * 0.4)  # element-wise add, size=[n, 512, x.h/16, x.w/16]
+        score = self.relu(self.deconv2(score))  # size=[n, 256, x.h/8, x.w/8]
+        score = self.bn2(score + x3 * 0.3)
+        score = self.relu(self.deconv3(score))  # size=[n, 128, x.h/4, x.w/4]
+        score = self.bn3(score + x2 * 0.2)
+        score = self.relu(self.deconv4(score))  # size=[n, 64, x.h/2, x.w/2]
+        score = self.bn4(score + x1 * 0.1)
+        score = self.bn5(self.relu(self.deconv5(score)))  # size=[n, 32, x.h, x.w]
+        score = self.classifier(score)  # size=[n, n_class, x.h, x.w]
+
+        return score
+
+
+class FCNs(nn.Module):
+    def __init__(self, pretrained_net, n_class):
+        super().__init__()
+        self.n_class = n_class
+        self.pretrained_net = pretrained_net
+        self.S1 = SEGet(64, 16)
+        self.S2 = SEGet(128, 16)
+        self.S3 = SEGet(256, 16)
+
+        self.relu = nn.ReLU(inplace=True)
+        self.deconv1 = nn.ConvTranspose2d(512, 256, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.bn1 = nn.BatchNorm2d(256)
+        self.deconv2 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.bn2 = nn.BatchNorm2d(128)
+        self.deconv3 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.bn3 = nn.BatchNorm2d(64)
+        self.deconv4 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.bn4 = nn.BatchNorm2d(32)
+        self.classifier = nn.Conv2d(32, n_class, kernel_size=1)
+
+    def forward(self, x):
+        output = self.pretrained_net.forward(x)
+        x4 = output['x4']  # size=[n, 512, x.h/16, x.w/16]
+        x3 = output['x3']  # size=[n, 512, x.h/8, x.w/8]
+        x2 = output['x2']  # size=[n, 512, x.h/4, x.w/4]
+        x1 = output['x1']  # size=[n, 512, x.h/2, x.w/2]
+
+        S1 = torch.sum(torch.sum(self.S1(x1)))
+        S2 = torch.sum(torch.sum(self.S2(x2)))
+        S3 = torch.sum(torch.sum(self.S3(x3)))
+
+        total_sum = S1 + S2 + S3
+
+        s1 = torch.div(S1, total_sum)
+        s2 = torch.div(S2, total_sum)
+        s3 = torch.div(S3, total_sum)
+
+        score = self.relu(self.deconv1(x4))  # size=[n, 512, x.h/16, x.w/16]
+        score = self.bn1(score + x3 * s3)  # element-wise add, size=[n, 512, x.h/16, x.w/16]
+        score = self.relu(self.deconv2(score))  # size=[n, 256, x.h/8, x.w/8]
+        score = self.bn2(score + x2 * s2)
+        score = self.relu(self.deconv3(score))  # size=[n, 128, x.h/4, x.w/4]
+        score = self.bn3(score + x1 * s1)
+        score = self.bn4(self.relu(self.deconv4(score)))
+        score = self.classifier(score)  # size=[n, n_class, x.h, x.w]
+
+        return score
+
+
 ranges = {
-    'vgg11': ((0, 3), (3, 6),  (6, 11),  (11, 16), (16, 21)),
+    'vgg11': ((0, 3), (3, 6), (6, 11), (11, 16), (16, 21)),
     'vgg13': ((0, 5), (5, 10), (10, 15), (15, 20), (20, 25)),
     'vgg16': ((0, 5), (5, 10), (10, 17), (17, 24), (24, 31)),
+    'vgg_self': ((0, 5), (5, 10), (10, 17), (17, 24)),
     'vgg19': ((0, 5), (5, 10), (10, 19), (19, 28), (28, 37))
 }
 
@@ -212,16 +402,12 @@ cfg = {
     'vgg11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'vgg13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'vgg16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
+    'vgg_self': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M'],
     'vgg19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
 }
 
 
 def make_layers(cfg, batch_norm=False):
-    """
-    :param cfg: cfg['vgg16']
-    :param batch_norm:
-    :return: [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M']  数字表示卷积  'M': 表示池化
-    """
     layers = []
     in_channels = 3
     for v in cfg:
@@ -244,15 +430,16 @@ class VGGNet(VGG):
         self.ranges = ranges[model]
 
         if pretrained:
-            vgg16 = models.vgg16(pretrained=False)
-            vgg16.load_state_dict(torch.load('models/vgg16-397923af.pth'))
-            # exec("self.load_state_dict(models.%s(pretrained=True).state_dict())" % model)
+            if model == 'vgg_self':
+                pass
+            else:
+                exec("self.load_state_dict(models.%s(pretrained=True).state_dict())" % model)
 
         if not requires_grad:
             for param in super().parameters():
                 param.requires_grad = False
 
-        if remove_fc:             # delete redundant fully-connected layer params, can save memory
+        if remove_fc:  # delete redundant fully-connected layer params, can save memory
             del self.classifier
 
         if show_params:
@@ -265,300 +452,6 @@ class VGGNet(VGG):
         for idx in range(len(self.ranges)):
             for layer in range(self.ranges[idx][0], self.ranges[idx][1]):
                 x = self.features[layer](x)
-            output["x%d" % (idx+1)] = x
+            output["x%d" % (idx + 1)] = x
+
         return output
-
-
-# other models
-class UNetEnc(nn.Module):
-
-    def __init__(self, in_channels, features, out_channels):
-        super().__init__()
-
-        self.up = nn.Sequential(
-            nn.Conv2d(in_channels, features, 3),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(features, features, 3),
-            nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(features, out_channels, 2, stride=2),
-            nn.ReLU(inplace=True),
-        )
-
-    def forward(self, x):
-        return self.up(x)
-
-
-class UNetDec(nn.Module):
-
-    def __init__(self, in_channels, out_channels, dropout=False):
-        super().__init__()
-
-        layers = [
-            nn.Conv2d(in_channels, out_channels, 3),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3),
-            nn.ReLU(inplace=True),
-        ]
-        if dropout:
-            layers += [nn.Dropout(.5)]
-        layers += [nn.MaxPool2d(2, stride=2, ceil_mode=True)]
-
-        self.down = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.down(x)
-
-
-class UNet(nn.Module):
-
-    def __init__(self, num_classes):
-        super().__init__()
-
-        self.dec1 = UNetDec(3, 64)
-        self.dec2 = UNetDec(64, 128)
-        self.dec3 = UNetDec(128, 256)
-        self.dec4 = UNetDec(256, 512, dropout=True)
-        self.center = nn.Sequential(
-            nn.Conv2d(512, 1024, 3),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(1024, 1024, 3),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.ConvTranspose2d(1024, 512, 2, stride=2),
-            nn.ReLU(inplace=True),
-        )
-        self.enc4 = UNetEnc(1024, 512, 256)
-        self.enc3 = UNetEnc(512, 256, 128)
-        self.enc2 = UNetEnc(256, 128, 64)
-        self.enc1 = nn.Sequential(
-            nn.Conv2d(128, 64, 3),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, 3),
-            nn.ReLU(inplace=True),
-        )
-        self.final = nn.Conv2d(64, num_classes, 1)
-
-    def forward(self, x):
-        dec1 = self.dec1(x)
-        dec2 = self.dec2(dec1)
-        dec3 = self.dec3(dec2)
-        dec4 = self.dec4(dec3)
-        center = self.center(dec4)
-        enc4 = self.enc4(torch.cat([
-            center, F.upsample_bilinear(dec4, center.size()[2:])], 1))
-        enc3 = self.enc3(torch.cat([
-            enc4, F.upsample_bilinear(dec3, enc4.size()[2:])], 1))
-        enc2 = self.enc2(torch.cat([
-            enc3, F.upsample_bilinear(dec2, enc3.size()[2:])], 1))
-        enc1 = self.enc1(torch.cat([
-            enc2, F.upsample_bilinear(dec1, enc2.size()[2:])], 1))
-
-        return F.upsample_bilinear(self.final(enc1), x.size()[2:])
-
-
-class SegNetEnc(nn.Module):
-
-    def __init__(self, in_channels, out_channels, num_layers):
-        super().__init__()
-
-        layers = [
-            nn.UpsamplingBilinear2d(scale_factor=2),
-            nn.Conv2d(in_channels, in_channels // 2, 3, padding=1),
-            nn.BatchNorm2d(in_channels // 2),
-            nn.ReLU(inplace=True),
-        ]
-        layers += [
-            nn.Conv2d(in_channels // 2, in_channels // 2, 3, padding=1),
-            nn.BatchNorm2d(in_channels // 2),
-            nn.ReLU(inplace=True),
-        ] * num_layers
-        layers += [
-            nn.Conv2d(in_channels // 2, out_channels, 3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        ]
-        self.encode = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.encode(x)
-
-
-class SegNet(nn.Module):
-
-    def __init__(self, num_classes):
-        super().__init__()
-
-        # should be vgg16bn but at the moment we have no pretrained bn models
-        decoders = list(models.vgg16(pretrained=True).features.children())
-
-        self.dec1 = nn.Sequential(*decoders[:5])
-        self.dec2 = nn.Sequential(*decoders[5:10])
-        self.dec3 = nn.Sequential(*decoders[10:17])
-        self.dec4 = nn.Sequential(*decoders[17:24])
-        self.dec5 = nn.Sequential(*decoders[24:])
-
-        # gives better results
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                m.requires_grad = False
-
-        self.enc5 = SegNetEnc(512, 512, 1)
-        self.enc4 = SegNetEnc(1024, 256, 1)
-        self.enc3 = SegNetEnc(512, 128, 1)
-        self.enc2 = SegNetEnc(256, 64, 0)
-        self.enc1 = nn.Sequential(
-            nn.UpsamplingBilinear2d(scale_factor=2),
-            nn.Conv2d(128, 64, 3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-        )
-        self.final = nn.Conv2d(64, num_classes, 3, padding=1)
-
-    def forward(self, x):
-        dec1 = self.dec1(x)
-        dec2 = self.dec2(dec1)
-        dec3 = self.dec3(dec2)
-        dec4 = self.dec4(dec3)
-        dec5 = self.dec5(dec4)
-        enc5 = self.enc5(dec5)
-        enc4 = self.enc4(torch.cat([dec4, enc5], 1))
-        enc3 = self.enc3(torch.cat([dec3, enc4], 1))
-        enc2 = self.enc2(torch.cat([dec2, enc3], 1))
-        enc1 = self.enc1(torch.cat([dec1, enc2], 1))
-
-        return F.upsample_bilinear(self.final(enc1), x.size()[2:])
-
-
-class PSPDec(nn.Module):
-
-    def __init__(self, in_features, out_features, downsize, upsize=60):
-        super().__init__()
-
-        self.features = nn.Sequential(
-            nn.AvgPool2d(downsize, stride=downsize),
-            nn.Conv2d(in_features, out_features, 1, bias=False),
-            nn.BatchNorm2d(out_features, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.UpsamplingBilinear2d(upsize)
-        )
-
-    def forward(self, x):
-        return self.features(x)
-
-
-class PSPNet(nn.Module):
-
-    def __init__(self, num_classes):
-        super().__init__()
-
-        '''
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 64, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(64, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, 3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(64, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 128, 3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(128, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(3, stride=2, padding=1),
-        )
-        '''
-
-        resnet = models.resnet101(pretrained=True)
-
-        self.conv1 = resnet.conv1
-        self.layer1 = resnet.layer1
-        self.layer2 = resnet.layer2
-        self.layer3 = resnet.layer3
-        self.layer4 = resnet.layer4
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                m.stride = 1
-                m.requires_grad = False
-            if isinstance(m, nn.BatchNorm2d):
-                m.requires_grad = False
-
-        self.layer5a = PSPDec(2048, 512, 60)
-        self.layer5b = PSPDec(2048, 512, 30)
-        self.layer5c = PSPDec(2048, 512, 20)
-        self.layer5d = PSPDec(2048, 512, 10)
-
-        self.final = nn.Sequential(
-            nn.Conv2d(2048, 512, 3, padding=1, bias=False),
-            nn.BatchNorm2d(512, momentum=.95),
-            nn.ReLU(inplace=True),
-            nn.Dropout(.1),
-            nn.Conv2d(512, num_classes, 1),
-        )
-
-    def forward(self, x):
-        print('x', x.size())
-        x = self.conv1(x)
-        print('conv1', x.size())
-        x = self.layer1(x)
-        print('layer1', x.size())
-        x = self.layer2(x)
-        print('layer2', x.size())
-        x = self.layer3(x)
-        print('layer3', x.size())
-        x = self.layer4(x)
-        print('layer4', x.size())
-        x = self.final(torch.cat([
-            x,
-            self.layer5a(x),
-            self.layer5b(x),
-            self.layer5c(x),
-            self.layer5d(x),
-        ], 1))
-        print('final', x.size())
-
-        return F.upsample_bilinear(self.final, x.size()[2:])
-
-
-if __name__ == "__main__":
-    batch_size, n_class, h, w = 10, 20, 160, 160
-
-    # test output size
-    vgg_model = VGGNet(requires_grad=True)
-    input = torch.autograd.Variable(torch.randn(batch_size, 3, h, w))    # 224
-    output = vgg_model.forward(input)
-    assert output['x5'].size() == torch.Size([batch_size, 512, 5, 5])
-
-    fcn_model = FCN32s(pretrained_net=vgg_model, n_class=n_class)
-    input = torch.autograd.Variable(torch.randn(batch_size, 3, h, w))
-    output = fcn_model.forward(input)
-    assert output.size() == torch.Size([batch_size, n_class, h, w])
-
-    fcn_model = FCN16s(pretrained_net=vgg_model, n_class=n_class)
-    input = torch.autograd.Variable(torch.randn(batch_size, 3, h, w))
-    output = fcn_model(input)
-    assert output.size() == torch.Size([batch_size, n_class, h, w])
-
-    fcn_model = FCN8s(pretrained_net=vgg_model, n_class=n_class)
-    input = torch.autograd.Variable(torch.randn(batch_size, 3, h, w))
-    output = fcn_model(input)
-    assert output.size() == torch.Size([batch_size, n_class, h, w])
-
-    fcn_model = FCN1s(pretrained_net=vgg_model, n_class=n_class)
-    input = torch.autograd.Variable(torch.randn(batch_size, 3, h, w))
-    output = fcn_model(input)
-    assert output.size() == torch.Size([batch_size, n_class, h, w])
-
-    # test a random batch, loss should decrease
-    fcn_model = FCN1s(pretrained_net=vgg_model, n_class=n_class)
-    criterion = nn.BCELoss()
-    optimizer = optim.SGD(fcn_model.parameters(), lr=1e-3, momentum=0.9)
-    input = torch.autograd.Variable(torch.randn(batch_size, 3, h, w))
-    y = torch.autograd.Variable(torch.randn(batch_size, n_class, h, w), requires_grad=False)
-    for iter in range(10):
-        optimizer.zero_grad()
-        output = fcn_model(input)
-
-        output = nn.functional.sigmoid(output)
-        loss = criterion(output, y)             # loss
-        loss.backward()
-        print("iter{}, loss {}".format(iter, loss.data[0]))
-        optimizer.step()

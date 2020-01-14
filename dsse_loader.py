@@ -10,27 +10,29 @@ import torch
 from torch.utils import data
 import cv2
 import random
+from XMLContext import GetContext
+import configparser
 
+cf = configparser.ConfigParser()
+cf.read("./config.ini")  # 读取配置文件，如果写文件的绝对路径，就可以不用os模
+
+max_height = int(cf.get("develop", "max_height"))
 
 """
 https://github.com/wkentaro/pytorch-fcn/blob/master/torchfcn/datasets/voc.py
 """
 
-
 class DSSESegBase(data.Dataset):
 
-    class_names = np.array([
-        'table',
-        'picture',
-        'text'
-    ])
+    class_names_create = ['__background__', 'figure', 'table', 'text']
     mean_bgr = np.array([104.00698793, 116.66876762, 122.67891434])
 
 
-    def __init__(self, root, split='train', transform=True):
+    def __init__(self, root, split='test', transform=True,PType = '.jpg'):
         self.root = root
         self.split = split
         self._transform = transform
+        self.PType = PType
 
         # VOC2011 and others are subset of VOC2012
         dataset_dir = osp.join(self.root, 'DSSE')
@@ -41,7 +43,7 @@ class DSSESegBase(data.Dataset):
             img_file = osp.join(dataset_dir, 'JPEGImages/%s' % img_name)
             lbl_name = img_name.replace('.jpg','_gt.npy')
             lbl_file = osp.join(dataset_dir, 'Annotation_img/%s' % lbl_name)
-            self.files['train'].append({
+            self.files[split].append({
                 'img': img_file,
                 'lbl': lbl_file,
                 })
@@ -73,30 +75,32 @@ class DSSESegBase(data.Dataset):
         # print(img.shape)
         
         lbl_file = data_file['lbl']
+        # target = (GetContext(lbl_file, PType=self.PType))
+        # lbl = target.numpy()
         lbl = np.load(lbl_file)
+        img,lbl = self.resize(img,lbl)
+        # print(lbl.shape,img.shape)
+       
         # lbl = PIL.Image.open(lbl_file)
         # lbl = np.array(lbl, dtype=np.uint8)
 
         # lbl[lbl == 255] = 0
         # augment
-        img, lbl = self.randomFlip(img, lbl)
-        img, lbl = self.randomCrop(img, lbl)
-        img, lbl = self.resize(img, lbl)
 
         if self._transform:
-            return self.transform(img, lbl)
+            return self.transform(img, lbl,img_file)
         else:
-            return img, lbl
+            return img, lbl,img_file
 
 
-    def transform(self, img, lbl):
+    def transform(self, img, lbl,img_file):
         img = img[:, :, ::-1]          # RGB -> BGR
         img = img.astype(np.float64)
         img -= self.mean_bgr
         img = img.transpose(2, 0, 1)   # whc -> cwh
         img = torch.from_numpy(img).float()
         lbl = torch.from_numpy(lbl).long()
-        return img, lbl
+        return img, lbl,img_file
 
     def untransform(self, img, lbl):
         img = img.numpy()
@@ -106,34 +110,13 @@ class DSSESegBase(data.Dataset):
         img = img[:, :, ::-1]          # BGR -> RGB
         lbl = lbl.numpy()
         return img, lbl
-
-    def randomFlip(self, img, label):
-        if random.random() < 0.5:
-            img = np.fliplr(img)
-            label = np.fliplr(label)
-        return img, label
-
-    def resize(self, img, label, s=320):
+    def resize(self, img, label):
         # print(s, img.shape)
-        img = cv2.resize(img, (s, s), interpolation=cv2.INTER_LINEAR)
-        label = cv2.resize(label, (s, s), interpolation=cv2.INTER_NEAREST)
+        # h = int(max_height / 64) * 64
+        # w = int(img.shape[1] * (max_height / img.shape[0]) / 64) * 64
+        img = cv2.resize(img, (512, 384), interpolation=cv2.INTER_LINEAR)
+        label = cv2.resize(label, (512, 384), interpolation=cv2.INTER_NEAREST)
         return img, label
-
-    def randomCrop(self, img, label):
-        h, w, _ = img.shape
-        short_size = min(w, h)
-        rand_size = random.randrange(int(0.7 * short_size), short_size)
-        x = random.randrange(0, w - rand_size)
-        y = random.randrange(0, h - rand_size)
-
-        return img[y:y + rand_size, x:x + rand_size], label[y:y + rand_size, x:x + rand_size]
-    # data augmentaion
-    def augmentation(self, img, lbl):
-        img, lbl = self.randomFlip(img, lbl)
-        img, lbl = self.randomCrop(img, lbl)
-        img, lbl = self.resize(img, lbl)
-        return img, lbl
-
     # elif not self.predict: # for batch test, this is needed
     #     img, label = self.randomCrop(img, label)
     #     img, label = self.resize(img, label, VOCClassSeg.img_size)
@@ -145,9 +128,8 @@ class DSSEClassSeg(DSSESegBase):
 
     # url = 'http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar'  # NOQA
 
-    def __init__(self, root, split='train', transform=False):
-        super(DSSEClassSeg, self).__init__(
-            root, split=split, transform=transform)
+    def __init__(self, root, split='train', transform=False,PType='.jpg'):
+        super(DSSEClassSeg, self).__init__(root, split=split, transform=transform,PType=PType)
 
 
 """
