@@ -26,7 +26,7 @@ def show(keys):
         if i != 0 and i % 5 == 0:
             print(s)
             s = ''
-
+    print(len(keys))
 class SKtune_unit(nn.Module):
     def __init__(self, channels, M=2, G=32, r=16, stride=1 ,L=32):
         """ Constructor
@@ -239,10 +239,20 @@ class ResNet(nn.Module):
                 if k in state_dict:
                     # print('ok',k)
                     model_dict[k] = v
-         
+        
         state_dict.update(model_dict)
         self.load_state_dict(state_dict)
-        show(model_dict.keys())
+        # print(prekey)
+        for name, m in self.named_modules():
+            # print(name,m)
+            # if name in prekey:
+            #     print('ok')
+            # else:
+            #     print('No')
+            if isinstance(m,nn.Conv2d) and "parallel" not in name:
+                # print(name)
+                m.weight.requires_grad = False
+        # show(model_dict.keys())
         # show(pretrain_dict.keys())
         print("Having loaded imagenet-pretrained successfully!")
     def forward(self, x):
@@ -321,12 +331,15 @@ def resnet18(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = Fals
     return model
 
 if __name__ == "__main__":
-    with torch.no_grad():
-        model = resnet50(pretrained=True)
-        model.eval()
-        k = []
-        for item in model.state_dict().keys():
-            if "tracked" in item or 'parallel' in item or 'sk' in item:
-                continue
-            k.append(item)
-        show(k)
+    # with torch.no_grad():
+    model = resnet18(pretrained=True)
+    k = []
+    # for item in model.state_dict().keys():
+    #     if "tracked" in item or 'parallel' in item or 'sk' in item:
+    #         continue
+    #     k.append(item)
+    # show(k)
+    i = 0
+    for name, m in model.named_modules():
+        if isinstance(m,nn.Conv2d):
+            print(name, m.weight.requires_grad)
