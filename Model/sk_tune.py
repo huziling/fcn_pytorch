@@ -288,7 +288,7 @@ class ResNet(nn.Module):
                 m.bias.data.zero_()
 
 
-def resnet50(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
+def sk_resnet50(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
     """Constructs a ResNet-50 model.
 
     Args:
@@ -314,7 +314,7 @@ def mean_image_subtraction(images, means=[123.68, 116.78, 103.94]):
     return images
 
 
-def resnet101(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
+def sk_resnet101(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
     """Constructs a ResNet-101 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
@@ -322,7 +322,7 @@ def resnet101(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = Fal
     model = ResNet(Bottleneck, [3, 4, 23, 3], bn_momentum, pretrained, output_stride,mode ='resnet101',sparable = sparable)
     return model
 
-def resnet18(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
+def sk_resnet18(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
     """Constructs a ResNet-18 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet

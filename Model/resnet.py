@@ -6,8 +6,10 @@ import torch.utils.model_zoo as model_zoo
 import torch
 import torch.nn.functional as F
 from torchsummary import summary
+from .Convolution import Conv2d
 # from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 # from .Convolution import SeparableConv2d
+from se_module import SELayer
 import os
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -23,7 +25,7 @@ model_urls = {
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None, bn_momentum=0.1,sparable = False):
+    def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None, bn_momentum=0.1,sparable = False,se = False):
         super(BasicBlock, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3, bias=False,padding=1)
         self.bn1 = nn.BatchNorm2d(planes)
@@ -33,6 +35,9 @@ class BasicBlock(nn.Module):
         self.bn2 = nn.BatchNorm2d(planes)
         self.downsample = downsample
         self.stride = stride
+        self.se = se
+        if se:
+            self.selayer = SELayer(planes,reduction=16)
 
     def forward(self, x):
         residual = x
@@ -56,7 +61,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None, bn_momentum=0.1,sparable = False):
+    def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None, bn_momentum=0.1,sparable = False,se = False):
         super(Bottleneck, self).__init__()
         
         if sparable:
@@ -79,6 +84,8 @@ class Bottleneck(nn.Module):
         self.bn3 = nn.BatchNorm2d(planes * self.expansion, momentum=bn_momentum)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
+        if se:
+            self.selayer = SELayer(planes * self.expansion,reduction=16)
         self.stride = stride
 
     def forward(self, x):
@@ -106,7 +113,7 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, bn_momentum=0.1, pretrained=False, output_stride=16,mode ='resnet50',sparable = False):
+    def __init__(self, block, layers, bn_momentum=0.1, pretrained=False, output_stride=16,mode ='resnet50',sparable = False,se = False):
         self.mode = mode
         if output_stride == 16:
             dilations = [1, 1, 1, 2]
@@ -127,20 +134,20 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], stride=strides[0], dilation=dilations[0],
-                                       bn_momentum=bn_momentum,sparable = sparable)
+                                       bn_momentum=bn_momentum,sparable = sparable,se = se)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=strides[1], dilation=dilations[1],
-                                       bn_momentum=bn_momentum,sparable = sparable)
+                                       bn_momentum=bn_momentum,sparable = sparable,se = se)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=strides[2], dilation=dilations[2],
-                                       bn_momentum=bn_momentum,sparable = sparable)
+                                       bn_momentum=bn_momentum,sparable = sparable,se = se)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=strides[3], dilation=dilations[3],
-                                       bn_momentum=bn_momentum,sparable = sparable)
+                                       bn_momentum=bn_momentum,sparable = sparable,se = se)
 
         self._init_weight()
 
         if pretrained:
             self._load_pretrained_model()
 
-    def _make_layer(self, block, planes, blocks, sparable,stride=1, dilation=1, bn_momentum=0.1):
+    def _make_layer(self, block, planes, blocks, sparable,stride=1, dilation=1, bn_momentum=0.1,se = False):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -150,7 +157,7 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, dilation, downsample, bn_momentum=bn_momentum,sparable=sparable))
+        layers.append(block(self.inplanes, planes, stride, dilation, downsample, bn_momentum=bn_momentum,sparable=sparable,se=se))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, dilation=dilation, bn_momentum=bn_momentum))

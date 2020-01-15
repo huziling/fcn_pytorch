@@ -7,6 +7,7 @@ from torchsummary import summary
 from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 from .Convolution import AsppConv,SeparableAsppConv,SeparableConv2d
 from .resnet import resnet101,resnet50,resnet18
+from .sk_tune import sk_resnet18,sk_resnet50,sk_resnet101
 from .AlignedXceptionWithoutDeformable import Xception
 import sys
 sys.path.append(os.path.abspath('..'))

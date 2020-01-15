@@ -12,10 +12,9 @@ from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 from .se_module import SELayer_2
 
 class Conv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, relu=True, same_padding=False, bn=False,Se=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, relu=True, padding=0,dilation=0, bn=False,Se=False):
         super(Conv2d, self).__init__()
-        padding = int((kernel_size - 1) / 2) if same_padding else 0
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding,dilation=dilation)
         self.bn = nn.BatchNorm2d(out_channels, eps=0.001, momentum=0.1, affine=True) if bn else None
         self.relu = nn.ReLU(inplace=True) if relu else None
         self.se = SELayer_2(in_channels, out_channels, 16) if Se else None
