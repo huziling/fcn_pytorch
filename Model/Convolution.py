@@ -47,8 +47,9 @@ class SeparableConv2d(nn.Module):
 
     def forward(self, x):
         x = self.depthwise(x)
-        # x = self.relu(x)
+        
         x = self.bn(x)
+        x = self.relu(x)
         x = self.pointwise(x)
         return x
 
@@ -67,9 +68,11 @@ class SeparableAsppConv(nn.Module):
     
     def forward(self,x):
         x = self.depthwise(x)
-        x = self.bn_dp(self.relu_dp(x))
+        # x = self.bn_dp(self.relu_dp(x))
+        x = self.relu_dp(self.bn_dp(x))
         x = self.pointwise(x)
-        x = self.bn(self.relu(x))
+        # x = self.bn(self.relu(x))
+        x = self.relu(self.bn(x))
         return x
 def AsppConv(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bn_momentum=0.1):
     asppconv = nn.Sequential(

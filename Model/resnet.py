@@ -208,13 +208,13 @@ class ResNet(nn.Module):
                 m.bias.data.zero_()
 
 
-def resnet50(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
+def resnet50(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False,se = False):
     """Constructs a ResNet-50 model.
 
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(Bottleneck, [3, 4, 6, 3], bn_momentum, pretrained, output_stride,mode ='resnet50',sparable = sparable)
+    model = ResNet(Bottleneck, [3, 4, 6, 3], bn_momentum, pretrained, output_stride,mode ='resnet50',sparable = sparable,se = se)
     return model
 
 
@@ -234,20 +234,20 @@ def mean_image_subtraction(images, means=[123.68, 116.78, 103.94]):
     return images
 
 
-def resnet101(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
+def resnet101(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False,se = False):
     """Constructs a ResNet-101 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(Bottleneck, [3, 4, 23, 3], bn_momentum, pretrained, output_stride,mode ='resnet101',sparable = sparable)
+    model = ResNet(Bottleneck, [3, 4, 23, 3], bn_momentum, pretrained, output_stride,mode ='resnet101',sparable = sparable,se = se)
     return model
 
-def resnet18(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False):
+def resnet18(bn_momentum=0.1, pretrained=False, output_stride=16,sparable = False,se = False):
     """Constructs a ResNet-18 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = ResNet(BasicBlock, [2, 2, 2, 2], bn_momentum, pretrained, output_stride,mode ='resnet18',sparable = sparable)
+    model = ResNet(BasicBlock, [2, 2, 2, 2], bn_momentum, pretrained, output_stride,mode ='resnet18',sparable = sparable,se = se)
     return model
 
 if __name__ == "__main__":

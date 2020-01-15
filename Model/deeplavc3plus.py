@@ -9,6 +9,7 @@ from .Convolution import AsppConv,SeparableAsppConv,SeparableConv2d
 from .resnet import resnet101,resnet50,resnet18
 from .sk_tune import sk_resnet18,sk_resnet50,sk_resnet101
 from .AlignedXceptionWithoutDeformable import Xception
+from .se_module import SELayer
 import sys
 sys.path.append(os.path.abspath('..'))
 
@@ -81,7 +82,7 @@ class AsppModule(nn.Module):
                 m.bias.data.zero_()
 
 class Encoder(nn.Module):
-    def __init__(self, bn_momentum=0.1, output_stride=16,mode = 'resnet50'):
+    def __init__(self, bn_momentum=0.1, output_stride=16,mode = 'resnet50',se = False):
         super(Encoder, self).__init__()
         self.ASPP = AsppModule(bn_momentum=bn_momentum, output_stride=output_stride,mode = mode)
         self.relu = nn.ReLU()
@@ -89,11 +90,14 @@ class Encoder(nn.Module):
         # self.bn1 = SynchronizedBatchNorm2d(256, momentum=bn_momentum)
         self.bn1 = nn.BatchNorm2d(256,momentum=bn_momentum)
         self.dropout = nn.Dropout(0.5)
+        if se:
+            self.selayer = SELayer(1024)
 
         self.__init_weight()
 
     def forward(self, input):
         input = self.ASPP(input)
+        input = self.selayer(input)
         input = self.conv1(input)
         input = self.bn1(input)
         input = self.relu(input)
@@ -109,7 +113,7 @@ class Encoder(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 class Decoder(nn.Module):
-    def __init__(self, class_num, bn_momentum=0.1,mode='resnet50'):
+    def __init__(self, class_num, bn_momentum=0.1,mode='resnet50',se = False):
         super(Decoder, self).__init__()
         if mode == 'resnet50':
         # self.conv1 = nn.Conv2d(256, 48, kernel_size=1, bias=False)
@@ -130,7 +134,8 @@ class Decoder(nn.Module):
         self.dropout3 = nn.Dropout(0.1)
         # self.conv4 = nn.Conv2d(256, class_num, kernel_size=1)
         self.conv4 = SeparableConv2d(256, class_num, kernel_size=3, bias=False)
-
+        if se:
+            self.selayer = SELayer(256)
         self._init_weight()
 
 
@@ -144,6 +149,7 @@ class Decoder(nn.Module):
         x_4_cat = self.conv2(x_4_cat)
         x_4_cat = self.bn2(x_4_cat)
         x_4_cat = self.relu(x_4_cat)
+        x_4_cat = self.selayer(x_4_cat)
         x_4_cat = self.dropout2(x_4_cat)
         x_4_cat = self.conv3(x_4_cat)
         x_4_cat = self.bn3(x_4_cat)
@@ -165,18 +171,18 @@ class Decoder(nn.Module):
 
 
 class DeepLab(nn.Module):
-    def __init__(self, output_stride, class_num, pretrained=True, bn_momentum=0.1, freeze_bn=False,mode = 'resnet50',sparable = False):
+    def __init__(self, output_stride, class_num, pretrained=True, bn_momentum=0.1, freeze_bn=False,mode = 'resnet50',sparable = False,se = False):
         super(DeepLab, self).__init__()
         # self.Resnet101 = resnet101(bn_momentum, pretrained)
         # self.Xception = Xception(output_stride,pretrained)
         if mode == 'resnet50':
-            self.basenet = resnet50(bn_momentum, pretrained,sparable = sparable)
+            self.basenet = resnet50(bn_momentum, pretrained,sparable = sparable,se = se)
         elif mode == 'xception':
             self.basenet = Xception(output_stride,pretrained)
         elif mode == 'resnet18':
-            self.basenet = resnet18(bn_momentum, pretrained,sparable = sparable)
-        self.encoder = Encoder(bn_momentum, output_stride,mode = mode)
-        self.decoder = Decoder(class_num, bn_momentum,mode = mode)
+            self.basenet = resnet18(bn_momentum, pretrained,sparable = sparable,se = se)
+        self.encoder = Encoder(bn_momentum, output_stride,mode = mode,se = se)
+        self.decoder = Decoder(class_num, bn_momentum,mode = mode,se = se)
         
         if freeze_bn:
             self.freeze_bn()
